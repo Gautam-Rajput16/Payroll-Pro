@@ -174,11 +174,15 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-  console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`📦 API Base: http://localhost:${PORT}/api/v1`);
-  console.log(`🔗 Client URL: ${process.env.CLIENT_URL}\n`);
-});
+// Only listen on a port if not running in a Vercel serverless environment
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`\n🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`📦 API Base: http://localhost:${PORT}/api/v1`);
+    console.log(`🔗 Client URL: ${process.env.CLIENT_URL}\n`);
+  });
+}
 
+// Export the Express API for Vercel
 module.exports = app;
