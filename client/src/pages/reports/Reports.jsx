@@ -132,8 +132,8 @@ const Reports = () => {
         <p className="text-gray-500 text-sm mt-1">Export your organisation's data for accounting and compliance.</p>
       </div>
 
-      <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-6 mb-8">
-        <div className="w-1/3">
+      <div className="bg-white p-4 sm:p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mb-8">
+        <div className="w-full sm:w-1/3">
           <Select 
             label="Select Month"
             value={month}
@@ -141,7 +141,7 @@ const Reports = () => {
             options={months}
           />
         </div>
-        <div className="w-1/3">
+        <div className="w-full sm:w-1/3">
           <Select 
             label="Select Year"
             value={year}

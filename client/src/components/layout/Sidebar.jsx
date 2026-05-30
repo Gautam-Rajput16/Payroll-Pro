@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, setIsOpen }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -31,10 +31,24 @@ const Sidebar = () => {
     { name: 'Settings', path: '/settings', icon: <Settings size={20} /> },
   ];
 
+  const handleItemClick = () => {
+    if (setIsOpen) setIsOpen(false);
+  };
+
   return (
-    <div className="flex h-full w-64 flex-col border-r border-gray-200 bg-white">
-      {/* Logo/Brand Area */}
-      <div className="flex h-16 items-center border-b border-gray-200 px-6">
+    <>
+      {/* Mobile Backdrop */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-gray-900/50 backdrop-blur-sm md:hidden transition-opacity"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div className={`fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col border-r border-gray-200 bg-white transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
+        {/* Logo/Brand Area */}
+        <div className="flex h-16 shrink-0 items-center border-b border-gray-200 px-6">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white font-bold">
             P
@@ -49,6 +63,7 @@ const Sidebar = () => {
           <NavLink
             key={item.name}
             to={item.path}
+            onClick={handleItemClick}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive
@@ -83,6 +98,7 @@ const Sidebar = () => {
         </button>
       </div>
     </div>
+    </>
   );
 };
 
