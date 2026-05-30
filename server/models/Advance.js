@@ -55,6 +55,11 @@ const advanceSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    status: {
+      type: String,
+      enum: ['Pending', 'Paid', 'Deducted'],
+      default: 'Pending',
+    },
     notes: {
       type: String,
       default: '',

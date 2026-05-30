@@ -31,9 +31,12 @@ const schema = yup.object().shape({
   reason: yup
     .string()
     .trim()
-    .required('Reason is required')
-    .min(5, 'Reason must be at least 5 characters')
+    .optional()
     .max(500, 'Reason must be less than 500 characters'),
+  paymentMode: yup
+    .string()
+    .required('Payment mode is required')
+    .oneOf(['Cash', 'UPI', 'Bank Transfer'], 'Invalid payment mode'),
   status: yup
     .string()
     .required('Status is required'),
@@ -58,6 +61,8 @@ const AdvanceForm = () => {
     defaultValues: {
       status: 'Pending',
       date: new Date().toISOString().split('T')[0],
+      reason: '',
+      paymentMode: 'Cash',
     }
   });
 
@@ -174,6 +179,18 @@ const AdvanceForm = () => {
                 success={touchedFields.date && !errors.date && dirtyFields.date}
               />
               <Select
+                label="Payment Mode"
+                required
+                {...register('paymentMode')}
+                error={errors.paymentMode}
+                success={touchedFields.paymentMode && !errors.paymentMode && dirtyFields.paymentMode}
+                options={[
+                  { value: 'Cash', label: 'Cash' },
+                  { value: 'UPI', label: 'UPI' },
+                  { value: 'Bank Transfer', label: 'Bank Transfer' },
+                ]}
+              />
+              <Select
                 label="Status"
                 required
                 {...register('status')}
@@ -190,7 +207,6 @@ const AdvanceForm = () => {
             <Textarea
               label="Reason for Advance"
               placeholder="Medical emergency, home repair, etc."
-              required
               maxLength={500}
               {...register('reason')}
               error={errors.reason}

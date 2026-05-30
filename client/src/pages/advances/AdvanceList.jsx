@@ -37,7 +37,9 @@ const AdvanceList = () => {
       const res = await axiosInstance.get('/admin/advances', {
         params: { page, limit, search: searchTerm }
       });
-      setData(res.data.data || []);
+      const responseData = res.data.data;
+      const advancesArray = Array.isArray(responseData) ? responseData : (responseData?.advances || []);
+      setData(advancesArray);
       setTotalPages(res.data.pagination?.totalPages || 1);
     } catch (error) {
       toast.error('Failed to fetch advances');

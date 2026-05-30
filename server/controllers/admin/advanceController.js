@@ -92,7 +92,7 @@ const getAdvances = async (req, res, next) => {
 const createAdvance = async (req, res, next) => {
   try {
     const orgId = req.user.orgId;
-    const { employeeId, date, amount, paymentMode, reason, notes } = req.body;
+    const { employeeId, date, amount, paymentMode, reason, status, notes } = req.body;
 
     // Verify employee belongs to this org and is active
     const employee = await Employee.findById(employeeId);
@@ -116,6 +116,7 @@ const createAdvance = async (req, res, next) => {
       date,
       amount,
       paymentMode,
+      status: status || 'Pending',
       reason: reason || '',
       notes: notes || '',
       createdBy: req.user.userId,
@@ -186,12 +187,13 @@ const updateAdvance = async (req, res, next) => {
     }
 
     const oldData = sanitizeForAudit(advance);
-    const { date, amount, paymentMode, reason, notes } = req.body;
+    const { date, amount, paymentMode, reason, status, notes } = req.body;
 
     if (date !== undefined) advance.date = date;
     if (amount !== undefined) advance.amount = amount;
     if (paymentMode !== undefined) advance.paymentMode = paymentMode;
     if (reason !== undefined) advance.reason = reason;
+    if (status !== undefined) advance.status = status;
     if (notes !== undefined) advance.notes = notes;
 
     advance.updatedBy = req.user.userId;

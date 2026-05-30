@@ -44,10 +44,15 @@ const advanceValidationRules = () => [
     .withMessage('Payment mode must be Cash, UPI, or Bank Transfer'),
 
   body('reason')
-    .optional()
+    .optional({ values: 'falsy' })
     .trim()
     .isLength({ max: 500 })
     .withMessage('Reason cannot exceed 500 characters'),
+
+  body('status')
+    .optional()
+    .isIn(['Pending', 'Paid', 'Deducted'])
+    .withMessage('Invalid status'),
 ];
 
 /**
@@ -85,10 +90,15 @@ const advanceUpdateValidationRules = () => [
     .withMessage('Payment mode must be Cash, UPI, or Bank Transfer'),
 
   body('reason')
-    .optional()
+    .optional({ values: 'falsy' })
     .trim()
     .isLength({ max: 500 })
     .withMessage('Reason cannot exceed 500 characters'),
+
+  body('status')
+    .optional()
+    .isIn(['Pending', 'Paid', 'Deducted'])
+    .withMessage('Invalid status'),
 ];
 
 /**
