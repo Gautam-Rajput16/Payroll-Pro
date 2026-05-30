@@ -16,12 +16,6 @@ const attendanceBulkValidationRules = () => [
     .isInt({ min: 2000, max: 2100 })
     .withMessage('Year must be a valid 4-digit year'),
 
-  body('workingDays')
-    .notEmpty()
-    .withMessage('Working days is required')
-    .isInt({ min: 1 })
-    .withMessage('Working days must be greater than 0'),
-
   body('records')
     .isArray({ min: 1 })
     .withMessage('Records must be a non-empty array'),
@@ -32,6 +26,12 @@ const attendanceBulkValidationRules = () => [
     .isMongoId()
     .withMessage('Invalid Employee ID format'),
 
+  body('records.*.workingDays')
+    .notEmpty()
+    .withMessage('Working days is required for each record')
+    .isInt({ min: 1 })
+    .withMessage('Working days must be greater than 0'),
+
   body('records.*.presentDays')
     .notEmpty()
     .withMessage('Present days is required for each record')
@@ -40,11 +40,10 @@ const attendanceBulkValidationRules = () => [
 
   // Custom validation: presentDays <= workingDays
   body('records').custom((records, { req }) => {
-    const workingDays = parseInt(req.body.workingDays);
     for (const record of records) {
-      if (parseInt(record.presentDays) > workingDays) {
+      if (parseInt(record.presentDays) > parseInt(record.workingDays)) {
         throw new Error(
-          `Present days (${record.presentDays}) cannot exceed working days (${workingDays}) for employee ${record.employeeId}`
+          `Present days (${record.presentDays}) cannot exceed working days (${record.workingDays}) for employee ${record.employeeId}`
         );
       }
     }

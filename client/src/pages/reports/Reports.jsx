@@ -40,7 +40,8 @@ const Reports = () => {
     setLoading(prev => ({ ...prev, salary: true }));
     try {
       const res = await axiosInstance.get('/admin/reports/salary', { params: { month, year } });
-      const salaries = Array.isArray(res.data.data) ? res.data.data : (res.data.data?.salaries || []);
+      const responseData = res.data.data;
+      const salaries = Array.isArray(responseData) ? responseData : (responseData?.data || []);
       const data = salaries.map(s => ({
         'Employee ID': s.employeeId?.employeeId,
         'Name': s.employeeId?.name,
@@ -70,7 +71,8 @@ const Reports = () => {
     setLoading(prev => ({ ...prev, advances: true }));
     try {
       const res = await axiosInstance.get('/admin/reports/advances', { params: { month, year } });
-      const advances = Array.isArray(res.data.data) ? res.data.data : (res.data.data?.advances || []);
+      const responseData = res.data.data;
+      const advances = Array.isArray(responseData) ? responseData : (responseData?.data || []);
       const data = advances.map(a => ({
         'Employee ID': a.employeeId?.employeeId,
         'Name': a.employeeId?.name,
@@ -98,13 +100,15 @@ const Reports = () => {
     setLoading(prev => ({ ...prev, attendance: true }));
     try {
       const res = await axiosInstance.get('/admin/reports/attendance', { params: { month, year } });
-      const records = Array.isArray(res.data.data) ? res.data.data : (res.data.data?.records || []);
-      const data = records.map(r => ({
-        'Employee ID': r.employeeId?.employeeId,
-        'Name': r.employeeId?.name,
-        'Date': new Date(r.date).toLocaleDateString(),
-        'Status': r.status,
-        'Notes': r.notes || ''
+      const responseData = res.data.data;
+      const attendance = Array.isArray(responseData) ? responseData : (responseData?.data || []);
+      const data = attendance.map(a => ({
+        'Employee ID': a.employeeId?.employeeId,
+        'Name': a.employeeId?.name,
+        'Month/Year': `${months.find(m => m.value === a.month)?.label || a.month} ${a.year}`,
+        'Working Days': a.workingDays,
+        'Present Days': a.presentDays,
+        'Status': a.status
       }));
       
       if (data.length === 0) {

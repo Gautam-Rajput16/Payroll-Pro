@@ -33,7 +33,7 @@ const Dashboard = () => {
             pendingLeaves: apiData.employeesWithPendingAttendance || 0,
             totalSalaryThisMonth: (apiData.totalSalaryPendingAmount || 0) + (apiData.totalSalaryPaidAmount || 0),
           },
-          salaryChart: [], // Placeholder since backend doesn't return chart data yet
+          salaryChart: apiData.salaryChart || [],
           recentAdvances: apiData.recentAdvances || [],
         });
       } catch (error) {
@@ -68,23 +68,17 @@ const Dashboard = () => {
           title="Total Employees"
           value={stats.totalEmployees || 0}
           icon={<Users size={24} />}
-          trend="up"
-          trendValue="12%"
         />
         <StatCard
           title="Total Advances (Active)"
           value={stats.activeAdvances || 0}
           isCurrency={true}
           icon={<Banknote size={24} />}
-          trend="down"
-          trendValue="5%"
         />
         <StatCard
           title="Pending Leaves"
           value={stats.pendingLeaves || 0}
           icon={<CalendarX2 size={24} />}
-          trend="up"
-          trendValue="2"
         />
         <StatCard
           title="Est. Payout (This Month)"

@@ -1,13 +1,18 @@
 import React from 'react';
 import Badge from '../ui/Badge';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 const RecentAdvances = ({ advances = [] }) => {
+  const navigate = useNavigate();
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden w-full">
       <div className="px-5 py-4 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
         <h3 className="text-lg font-semibold text-gray-900">Recent Advances</h3>
-        <button className="text-sm font-medium text-primary hover:text-primary-dark">
+        <button 
+          onClick={() => navigate('/advances')}
+          className="text-sm font-medium text-primary hover:text-primary-dark"
+        >
           View All
         </button>
       </div>

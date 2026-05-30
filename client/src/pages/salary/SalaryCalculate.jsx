@@ -5,7 +5,7 @@ import {
   flexRender,
 } from '@tanstack/react-table';
 import { useNavigate } from 'react-router-dom';
-import { Calculator, Download, Eye, FileText } from 'lucide-react';
+import { Calculator, Download, Eye, FileText, CheckCircle } from 'lucide-react';
 import { format, subMonths } from 'date-fns';
 import axiosInstance from '../../api/axiosInstance';
 import toast from 'react-hot-toast';
@@ -17,6 +17,7 @@ import Badge from '../../components/ui/Badge';
 import { TableSkeleton } from '../../components/ui/Skeleton';
 import EmptyState from '../../components/ui/EmptyState';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
+import SalarySlipModal from './SalarySlipModal';
 
 const SalaryCalculate = () => {
   const navigate = useNavigate();
@@ -30,6 +31,9 @@ const SalaryCalculate = () => {
   const [isCalculateModalOpen, setIsCalculateModalOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [calculating, setCalculating] = useState(false);
+  
+  const [isSlipModalOpen, setIsSlipModalOpen] = useState(false);
+  const [slipEmployeeId, setSlipEmployeeId] = useState(null);
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i + 1,
@@ -44,26 +48,36 @@ const SalaryCalculate = () => {
   const fetchSalaryStatus = async () => {
     try {
       setLoading(true);
-      // We assume an endpoint that returns employees and their salary status for a given month/year
-      // Since it might not exist explicitly like this, we'll fetch employees and then salaries
       
-      const empRes = await axiosInstance.get('/admin/employees?limit=100');
-      const allEmployees = Array.isArray(empRes.data.data) ? empRes.data.data : [];
+      const [empRes, salRes, attRes, advRes] = await Promise.all([
+        axiosInstance.get('/admin/employees?limit=100'),
+        axiosInstance.get('/admin/salary', { params: { month, year, limit: 100 } }),
+        axiosInstance.get('/admin/attendance', { params: { month, year } }),
+        axiosInstance.get('/admin/advances/summary', { params: { month, year } })
+      ]);
+      
+      const responseData = empRes.data.data;
+      const allEmployees = Array.isArray(responseData) ? responseData : (responseData?.employees || []);
       const activeEmployees = allEmployees.filter(e => e.status === 'Active');
       
-      const salRes = await axiosInstance.get('/admin/salary', {
-        params: { month, year, limit: 100 }
-      });
-      const generatedSalaries = Array.isArray(salRes.data.data) ? salRes.data.data : [];
+      const generatedSalaries = Array.isArray(salRes.data.data) ? salRes.data.data : (salRes.data.data?.salaries || []);
+      const attendanceData = Array.isArray(attRes.data.data) ? attRes.data.data : (attRes.data.data?.records || []);
+      const advanceData = Array.isArray(advRes.data.data) ? advRes.data.data : [];
       
       const mappedData = activeEmployees.map(emp => {
         const salaryRecord = generatedSalaries.find(s => s.employeeId?._id === emp._id || s.employeeId === emp._id);
+        const attRecord = attendanceData.find(a => a.employeeId?._id === emp._id || a.employeeId === emp._id);
+        const advRecord = advanceData.find(a => a.employeeId === emp._id);
+
         return {
           employee: emp,
           isGenerated: !!salaryRecord,
           salaryId: salaryRecord?._id,
           netSalary: salaryRecord?.netSalary,
-          status: salaryRecord?.status || 'Pending'
+          totalAdvances: salaryRecord ? salaryRecord.totalAdvances : (advRecord?.totalAdvances || 0),
+          workingDays: salaryRecord ? salaryRecord.workingDaysSnapshot : (attRecord?.workingDays || '-'),
+          presentDays: salaryRecord ? salaryRecord.presentDays : (attRecord?.presentDays || '-'),
+          status: salaryRecord?.paymentStatus || 'Pending'
         };
       });
       
@@ -97,6 +111,48 @@ const SalaryCalculate = () => {
     }
   };
 
+  const handleMarkAsPaid = async (salaryId) => {
+    try {
+      await axiosInstance.patch(`/admin/salary/${salaryId}/status`, { paymentStatus: 'Paid' });
+      toast.success('Salary marked as paid');
+      fetchSalaryStatus();
+    } catch (error) {
+      toast.error('Failed to update status');
+    }
+  };
+
+  const handleBankExport = () => {
+    const generated = data.filter(d => d.isGenerated);
+    if (generated.length === 0) {
+      toast.error('No generated salaries to export');
+      return;
+    }
+
+    const headers = ['Employee Code', 'Employee Name', 'Bank Name', 'Account Number', 'IFSC Code', 'Amount Payable'];
+    const rows = generated.map(d => [
+      d.employee.employeeId,
+      d.employee.name,
+      d.employee.bankName || 'N/A',
+      d.employee.accountNumber || 'N/A',
+      d.employee.ifscCode || 'N/A',
+      d.netSalary
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Bank_Export_${months.find(m => m.value === month)?.label}_${year}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const columns = useMemo(() => [
     {
       header: 'Employee',
@@ -110,8 +166,18 @@ const SalaryCalculate = () => {
     },
     {
       header: 'Base Salary',
-      accessorFn: row => row.employee.baseSalary,
+      accessorFn: row => row.employee.monthlySalary,
       cell: (info) => `₹${info.getValue()?.toLocaleString('en-IN')}`
+    },
+    {
+      header: 'Working Days',
+      accessorFn: row => `${row.presentDays} / ${row.workingDays}`,
+      cell: (info) => info.getValue()
+    },
+    {
+      header: 'Advances',
+      accessorKey: 'totalAdvances',
+      cell: (info) => info.getValue() > 0 ? `- ₹${info.getValue().toLocaleString('en-IN')}` : '-'
     },
     {
       header: 'Net Salary',
@@ -145,17 +211,29 @@ const SalaryCalculate = () => {
               Calculate
             </Button>
           ) : (
-            <Button 
-              size="sm" 
-              variant="secondary"
-              icon={<FileText size={14} />}
-              onClick={() => {
-                // In a real app, this would generate/download the PDF slip
-                toast.success('Generating slip...');
-              }}
-            >
-              View Slip
-            </Button>
+            <>
+              {row.original.status !== 'Paid' && (
+                <Button 
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white border-transparent"
+                  icon={<CheckCircle size={14} />}
+                  onClick={() => handleMarkAsPaid(row.original.salaryId)}
+                >
+                  Mark Paid
+                </Button>
+              )}
+              <Button 
+                size="sm" 
+                variant="secondary"
+                icon={<FileText size={14} />}
+                onClick={() => {
+                  setSlipEmployeeId(row.original.employee._id);
+                  setIsSlipModalOpen(true);
+                }}
+              >
+                View Slip
+              </Button>
+            </>
           )}
         </div>
       )
@@ -197,7 +275,7 @@ const SalaryCalculate = () => {
           <Button 
             variant="secondary" 
             icon={<Download size={16} />}
-            onClick={() => toast.success('Exporting bank format...')}
+            onClick={handleBankExport}
           >
             Bank Export
           </Button>
@@ -248,6 +326,14 @@ const SalaryCalculate = () => {
         message={`Are you sure you want to calculate and generate the salary for ${selectedEmployee?.name} for ${months.find(m => m.value === month)?.label} ${year}? This will deduct active advances based on the snapshot.`}
         confirmText="Calculate & Generate"
         isDanger={false}
+      />
+      
+      <SalarySlipModal
+        isOpen={isSlipModalOpen}
+        onClose={() => setIsSlipModalOpen(false)}
+        employeeId={slipEmployeeId}
+        month={month}
+        year={year}
       />
     </div>
   );

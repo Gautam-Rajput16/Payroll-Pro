@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { format } from 'date-fns';
 import { Calendar, Save, CheckCircle, AlertTriangle } from 'lucide-react';
 import axiosInstance from '../../api/axiosInstance';
 import toast from 'react-hot-toast';
 
 import Button from '../../components/ui/Button';
-import Input from '../../components/ui/Input';
 import Card, { CardContent } from '../../components/ui/Card';
 import { TableSkeleton } from '../../components/ui/Skeleton';
 import EmptyState from '../../components/ui/EmptyState';
@@ -17,34 +15,36 @@ const AttendanceEntry = () => {
   const [finalizing, setFinalizing] = useState(false);
   const [employees, setEmployees] = useState([]);
   
-  const today = new Date().toISOString().split('T')[0];
-  const [selectedDate, setSelectedDate] = useState(today);
+  const currentDate = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
   
-  // Storing attendance locally before saving
-  // Format: { [employeeId]: { status: 'Present', notes: '' } }
+  // Format: { [employeeId]: { presentDays: 26, workingDays: 26, id: '...', status: 'Draft' } }
   const [attendanceData, setAttendanceData] = useState({});
   const [isFinalized, setIsFinalized] = useState(false);
   
   const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
 
-  const fetchAttendance = async (date) => {
+  const fetchAttendance = async (month, year) => {
     try {
       setLoading(true);
       
       // Fetch active employees
       const empRes = await axiosInstance.get('/admin/employees?limit=100');
-      const allEmployees = Array.isArray(empRes.data.data) ? empRes.data.data : [];
+      // Fix potential mapping issue with empRes.data.data
+      const responseData = empRes.data.data;
+      const allEmployees = Array.isArray(responseData) ? responseData : (responseData?.employees || []);
       const activeEmployees = allEmployees.filter(emp => emp.status === 'Active');
       setEmployees(activeEmployees);
       
-      // Try fetching existing attendance for this date
+      // Try fetching existing attendance for this month/year
       const attRes = await axiosInstance.get('/admin/attendance', {
-        params: { date }
+        params: { month, year }
       });
       
       const attData = attRes.data.data;
       const records = Array.isArray(attData) ? attData : (attData?.records || []);
-      const finalized = records.some(r => r.isFinalized);
+      const finalized = records.some(r => r.status === 'Finalized');
       setIsFinalized(finalized);
       
       const attMap = {};
@@ -53,22 +53,23 @@ const AttendanceEntry = () => {
         // Load existing records
         records.forEach(r => {
           attMap[r.employeeId._id || r.employeeId] = {
-            status: r.status,
-            notes: r.notes || '',
-            id: r._id
+            presentDays: r.presentDays,
+            workingDays: r.workingDays,
+            id: r._id,
+            status: r.status
           };
         });
         
         // Add active employees that might not have a record yet
         activeEmployees.forEach(emp => {
           if (!attMap[emp._id]) {
-             attMap[emp._id] = { status: 'Present', notes: '' };
+             attMap[emp._id] = { presentDays: 26, workingDays: 26, status: 'Draft' };
           }
         });
       } else {
-        // Default all active employees to Present if no records
+        // Default all active employees
         activeEmployees.forEach(emp => {
-          attMap[emp._id] = { status: 'Present', notes: '' };
+          attMap[emp._id] = { presentDays: 26, workingDays: 26, status: 'Draft' };
         });
       }
       
@@ -81,22 +82,22 @@ const AttendanceEntry = () => {
   };
 
   useEffect(() => {
-    fetchAttendance(selectedDate);
-  }, [selectedDate]);
+    fetchAttendance(selectedMonth, selectedYear);
+  }, [selectedMonth, selectedYear]);
 
-  const handleStatusChange = (empId, status) => {
+  const handleWorkingDaysChange = (empId, days) => {
     if (isFinalized) return;
     setAttendanceData(prev => ({
       ...prev,
-      [empId]: { ...prev[empId], status }
+      [empId]: { ...prev[empId], workingDays: days }
     }));
   };
 
-  const handleNotesChange = (empId, notes) => {
+  const handlePresentDaysChange = (empId, days) => {
     if (isFinalized) return;
     setAttendanceData(prev => ({
       ...prev,
-      [empId]: { ...prev[empId], notes }
+      [empId]: { ...prev[empId], presentDays: days }
     }));
   };
 
@@ -106,14 +107,13 @@ const AttendanceEntry = () => {
     try {
       const records = Object.entries(attendanceData).map(([empId, data]) => ({
         employeeId: empId,
-        date: selectedDate,
-        status: data.status,
-        notes: data.notes
+        presentDays: data.presentDays,
+        workingDays: data.workingDays
       }));
       
-      // Assuming a bulk create/update endpoint
-      await axiosInstance.post('/admin/attendance/bulk', { records });
+      await axiosInstance.post('/admin/attendance/bulk', { month: selectedMonth, year: selectedYear, records });
       toast.success('Attendance draft saved');
+      fetchAttendance(selectedMonth, selectedYear);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to save attendance');
     } finally {
@@ -127,19 +127,21 @@ const AttendanceEntry = () => {
       // First save draft, then finalize via an endpoint or by passing isFinalized
       const records = Object.entries(attendanceData).map(([empId, data]) => ({
         employeeId: empId,
-        date: selectedDate,
-        status: data.status,
-        notes: data.notes,
-        isFinalized: true
+        presentDays: data.presentDays,
+        workingDays: data.workingDays
       }));
       
-      await axiosInstance.post('/admin/attendance/bulk', { records });
+      await axiosInstance.post('/admin/attendance/bulk', { month: selectedMonth, year: selectedYear, records });
+      
+      await axiosInstance.post('/admin/attendance/finalize', { month: selectedMonth, year: selectedYear });
       toast.success('Attendance finalized successfully');
       setIsFinalized(true);
+      fetchAttendance(selectedMonth, selectedYear);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to finalize attendance');
     } finally {
       setFinalizing(false);
+      setIsFinalizeModalOpen(false);
     }
   };
 
@@ -147,8 +149,8 @@ const AttendanceEntry = () => {
     <div className="space-y-6 pb-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Attendance Entry</h2>
-          <p className="text-gray-500 text-sm mt-1">Mark daily attendance for your active employees.</p>
+          <h2 className="text-2xl font-bold text-gray-900">Monthly Attendance Entry</h2>
+          <p className="text-gray-500 text-sm mt-1">Mark monthly attendance (working and present days) for your active employees.</p>
         </div>
       </div>
 
@@ -157,12 +159,25 @@ const AttendanceEntry = () => {
           <div className="flex items-center gap-3">
             <div className="bg-white rounded-lg border border-gray-200 px-3 py-2 flex items-center shadow-sm">
               <Calendar className="text-gray-400 mr-2 h-5 w-5" />
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+              <select 
+                value={selectedMonth} 
+                onChange={e => setSelectedMonth(Number(e.target.value))}
                 className="bg-transparent border-none text-sm font-medium text-gray-700 focus:outline-none"
-              />
+              >
+                {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                  <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('default', { month: 'short' })}</option>
+                ))}
+              </select>
+              <span className="mx-2 text-gray-300">/</span>
+              <select 
+                value={selectedYear} 
+                onChange={e => setSelectedYear(Number(e.target.value))}
+                className="bg-transparent border-none text-sm font-medium text-gray-700 focus:outline-none"
+              >
+                {Array.from({length: 5}, (_, i) => new Date().getFullYear() - 2 + i).map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
             </div>
             
             {isFinalized && (
@@ -210,13 +225,13 @@ const AttendanceEntry = () => {
               <thead className="bg-gray-50 text-xs uppercase text-gray-700">
                 <tr>
                   <th className="px-5 py-3 font-medium border-b border-gray-200">Employee</th>
-                  <th className="px-5 py-3 font-medium border-b border-gray-200 w-48">Status</th>
-                  <th className="px-5 py-3 font-medium border-b border-gray-200 min-w-[200px]">Notes (Optional)</th>
+                  <th className="px-5 py-3 font-medium border-b border-gray-200 w-48">Working Days</th>
+                  <th className="px-5 py-3 font-medium border-b border-gray-200 w-48">Present Days</th>
                 </tr>
               </thead>
               <tbody>
                 {employees.map(emp => {
-                  const empData = attendanceData[emp._id] || { status: 'Present', notes: '' };
+                  const empData = attendanceData[emp._id] || { presentDays: 26, workingDays: 26, status: 'Draft' };
                   
                   return (
                     <tr key={emp._id} className="border-b border-gray-100 hover:bg-gray-50/50 transition-colors">
@@ -225,30 +240,25 @@ const AttendanceEntry = () => {
                         <div className="text-xs text-gray-500">{emp.employeeId}</div>
                       </td>
                       <td className="px-5 py-3">
-                        <select
-                          value={empData.status}
-                          onChange={(e) => handleStatusChange(emp._id, e.target.value)}
+                        <input
+                          type="number"
+                          min="0"
+                          max="31"
+                          value={empData.workingDays}
+                          onChange={(e) => handleWorkingDaysChange(emp._id, Number(e.target.value))}
                           disabled={isFinalized}
-                          className={`flex h-9 w-full rounded-md border bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:bg-gray-50
-                            ${empData.status === 'Absent' ? 'text-red-700 border-red-200 bg-red-50' : 
-                              empData.status === 'Half Day' ? 'text-amber-700 border-amber-200 bg-amber-50' : 
-                              empData.status === 'Leave' ? 'text-blue-700 border-blue-200 bg-blue-50' : 
-                              'text-emerald-700 border-emerald-200 bg-emerald-50'}`}
-                        >
-                          <option value="Present">Present</option>
-                          <option value="Absent">Absent</option>
-                          <option value="Half Day">Half Day</option>
-                          <option value="Leave">Leave</option>
-                        </select>
+                          className="flex h-9 w-24 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:bg-gray-50"
+                        />
                       </td>
                       <td className="px-5 py-3">
                         <input
-                          type="text"
-                          value={empData.notes}
-                          onChange={(e) => handleNotesChange(emp._id, e.target.value)}
+                          type="number"
+                          min="0"
+                          max={empData.workingDays}
+                          value={empData.presentDays}
+                          onChange={(e) => handlePresentDaysChange(emp._id, Number(e.target.value))}
                           disabled={isFinalized}
-                          placeholder={isFinalized ? '-' : 'Add note...'}
-                          className="flex h-9 w-full rounded-md border border-gray-200 bg-white px-3 py-1 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:bg-gray-50"
+                          className="flex h-9 w-24 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:bg-gray-50"
                         />
                       </td>
                     </tr>
@@ -265,7 +275,7 @@ const AttendanceEntry = () => {
         onClose={() => setIsFinalizeModalOpen(false)}
         onConfirm={handleFinalize}
         title="Finalize Attendance"
-        message="Are you sure you want to finalize the attendance for this date? Once finalized, you cannot modify these records."
+        message="Are you sure you want to finalize the attendance for this month? Once finalized, you cannot modify these records."
         confirmText="Finalize"
         isDanger={false}
       />

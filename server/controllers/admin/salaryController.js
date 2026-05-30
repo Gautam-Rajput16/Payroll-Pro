@@ -4,7 +4,7 @@ const Employee = require('../../models/Employee');
 const Advance = require('../../models/Advance');
 const Attendance = require('../../models/Attendance');
 const Organisation = require('../../models/Organisation');
-const { calculateNetSalary } = require('../../utils/salaryCalculator');
+const { calculateSalary } = require('../../utils/salaryCalculator');
 const { successResponse, errorResponse } = require('../../utils/responseFormatter');
 const { createAuditLog } = require('../../utils/auditLogger');
 
@@ -66,7 +66,7 @@ const calculateSalaries = async (req, res, next) => {
       const totalAdvances = advances.reduce((sum, adv) => sum + adv.amount, 0);
 
       // Calculate
-      const { perDaySalary, grossSalary, netSalary } = calculateNetSalary(
+      const { perDaySalary, grossSalary, netSalary } = calculateSalary(
         employee.monthlySalary,
         attendance.workingDays,
         attendance.presentDays,

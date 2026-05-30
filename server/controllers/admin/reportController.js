@@ -161,9 +161,39 @@ const getFullEmployeeReport = async (req, res, next) => {
   }
 };
 
+/**
+ * @desc    Get Attendance Report
+ * @route   GET /api/v1/admin/reports/attendance
+ * @access  Private (Admin)
+ */
+const getAttendanceReport = async (req, res, next) => {
+  try {
+    const { month, year, status, employeeId } = req.query;
+    const filter = { orgId: req.user.orgId, isDeleted: false };
+
+    if (month) filter.month = parseInt(month);
+    if (year) filter.year = parseInt(year);
+    if (status) filter.status = status;
+    if (employeeId) filter.employeeId = employeeId;
+
+    const attendance = await Attendance.find(filter)
+      .populate('employeeId', 'name employeeId designation')
+      .sort({ year: -1, month: -1 })
+      .lean();
+
+    return successResponse(res, 200, 'Attendance report generated', {
+      count: attendance.length,
+      data: attendance,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getEmployeeReport,
   getAdvanceReport,
   getSalaryReport,
   getFullEmployeeReport,
+  getAttendanceReport,
 };

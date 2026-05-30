@@ -6,6 +6,7 @@ const {
   getAdvanceReport,
   getSalaryReport,
   getFullEmployeeReport,
+  getAttendanceReport,
 } = require('../../controllers/admin/reportController');
 
 // All routes require admin auth
@@ -19,6 +20,9 @@ router.get('/advances', getAdvanceReport);
 
 // GET /api/admin/reports/salary - Salary report
 router.get('/salary', getSalaryReport);
+
+// GET /api/admin/reports/attendance - Attendance report
+router.get('/attendance', getAttendanceReport);
 
 // GET /api/admin/reports/employee/:employeeId/full - Full employee report
 router.get('/employee/:employeeId/full', getFullEmployeeReport);

@@ -109,6 +109,45 @@ const getDashboard = async (req, res, next) => {
       .limit(5)
       .lean();
 
+    // 6. Salary Chart Data (Last 6 Months)
+    const last6Months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      last6Months.push({
+        monthNum: d.getMonth() + 1,
+        year: d.getFullYear(),
+        month: d.toLocaleString('default', { month: 'short' }),
+        salary: 0,
+        advance: 0
+      });
+    }
+
+    const chartAgg = await Salary.aggregate([
+      {
+        $match: {
+          orgId,
+          isDeleted: false,
+          year: { $gte: last6Months[0].year }
+        }
+      },
+      {
+        $group: {
+          _id: { month: '$month', year: '$year' },
+          totalSalary: { $sum: '$netSalary' },
+          totalAdvance: { $sum: '$totalAdvances' }
+        }
+      }
+    ]);
+
+    const salaryChart = last6Months.map(m => {
+      const found = chartAgg.find(c => c._id.month === m.monthNum && c._id.year === m.year);
+      return {
+        month: m.month,
+        salary: found ? found.totalSalary : 0,
+        advance: found ? found.totalAdvance : 0
+      };
+    });
+
     return successResponse(res, 200, 'Dashboard data fetched successfully', {
       totalEmployees,
       activeEmployees,
@@ -122,6 +161,7 @@ const getDashboard = async (req, res, next) => {
       employeesWithPendingAttendance: employeesNeedingAttendance,
       recentAdvances,
       recentSalaryCalculations,
+      salaryChart,
     });
   } catch (error) {
     next(error);
